@@ -1,0 +1,164 @@
+
+import unittest
+import json
+import iTunesStarterCode as proj1
+# part1
+class Media:
+    def __init__(self, title="No Title", author="No Author", release_year="No Release Year", url="No URL"):
+        self.title = title
+        self.author = author
+        self.release_year = release_year
+        self.url = url
+    def info(self):
+        return f"{self.title} by {self.author} ({self.release_year})"
+    def length(self):         return 0
+class Song(Media):
+    def __init__(self, title="No Title", author="No Author", release_year="No Release Year", url="No URL", album="No Album", genre="No Genre", track_length=0):
+        super().__init__(title, author, release_year, url)  # Initializing 
+variables of the parent class
+        self.album = album
+        self.genre = genre
+        self.track_length = track_length  # This should store value in milliseconds
+    def info(self):
+        return super().info() + f" [{self.genre}]"
+    def length(self):
+        return round(self.track_length / 1000)  # Converting milliseconds to seconds
+class Movie(Media):
+    def __init__(self, title="No Title", author="No Author", release_year="No Release Year", url="No URL", rating="No Rating", movie_length=0):
+        super().__init__(title, author, release_year, url)  # Initializing 
+variables of the parent class
+        self.rating = rating
+        self.movie_length = movie_length  # This should store value in milliseconds
+    def info(self):
+        return super().info() + f" [{self.rating}]"
+    def length(self):
+        return round(self.movie_length / 60000)  # Converting milliseconds to minutes
+# Example of usage
+song = Song(title="Hey Jude", author="The Beatles", release_year=1968, 
+genre="Rock", track_length=280000)
+print(song.info(),song.length())  # Output: Hey Jude by The Beatles (1968) [Rock] 280
+movie = Movie(title="Jaws", author="Steven Spielberg", release_year=1975, rating="PG", movie_length=7200000)
+print(movie.info(),movie.length())  # Output: Jaws by Steven Spielberg (1975) [PG] 120
+# part2
+class Media:
+    def __init__(self, title="", author="", release_year="", url="", json=None):         if json:
+            self.title = json.get("trackName", title)
+            self.author = json.get("artistName", author)
+            self.release_year = json.get("releaseDate", release_year)[:4]  
+            self.url = json.get("trackViewUrl", url)
+        else:
+            self.title = title
+            self.author = author
+            self.release_year = release_year
+            self.url = url
+    def info(self):
+        return f"{self.title} by {self.author} ({self.release_year})"
+    def length(self):         return 0
+class Song(Media):
+    def __init__(self, title="", author="", release_year="", url="", album="", genre="", track_length=0, json=None):
+        super().__init__(title, author, release_year, url, json)
+        if json:
+            self.album = json.get("collectionName", album)
+            self.genre = json.get("primaryGenreName", genre)
+            self.track_length = json.get("trackTimeMillis", track_length)         else:
+            self.album = album
+            self.genre = genre
+            self.track_length = track_length//1000 # Assuming track_length is in milliseconds
+    def info(self):
+        return f"{self.title} by {self.author} ({self.release_year}) [{self.genre}]"
+    def length(self):
+        return self.track_length // 1000  # Assuming track_length is in milliseconds
+class Movie(Media):
+    def __init__(self, title="", author="", release_year="", url="", rating="", movie_length=0, json=None):
+        super().__init__(title, author, release_year, url, json)
+        if json:
+            self.rating = json.get("contentAdvisoryRating", rating)
+            self.movie_length = json.get("trackTimeMillis", movie_length)         else:
+            self.rating = rating
+            self.movie_length = movie_length // 60000  # Assuming movie_length is in milliseconds
+    def info(self):
+        return f"{self.title} by {self.author} ({self.release_year}) [{self.rating}]"
+    def length(self):
+        return self.movie_length // 60000  # Assuming movie_length is in milliseconds
+file_path = 'sample_json.json'
+with open(file_path, 'r') as file:     json_data = json.load(file)
+movie = Movie(json=json_data[0]) print(movie.info())
+# Part 3
+import requests
+# fetch data from iTunes API
+def fetch_itunes_data(term, media_type='all', limit=20):     base_url = 'https://itunes.apple.com/search'
+    params = {
+        'term': term,
+        'media': media_type,
+        'limit': limit
+    }
+    response = requests.get(base_url, params=params)
+    return response.json()
+# process the json data
+def create_media_objects(json_data):     songs = []
+    movies = []
+    for item in json_data['results']:
+        if item['wrapperType'] == 'track':
+            if item['kind'] == 'song':                 songs.append(Song(json=item))
+            elif item['kind'] == 'feature-movie':                 movies.append(Movie(json=item))
+    return songs, movies
+# Example Query
+json_data = fetch_itunes_data('Taylor Swift', 'music', 5) songs, _ = create_media_objects(json_data)
+for song in songs:     print(song.info())
+# part 4 create an interactive search interface
+import webbrowser
+def main():
+    while True:
+        user_input = input('Enter a search term, or "exit" to quit: ')
+        if user_input.lower() == 'exit':
+            print("Bye!")
+            break
+        else:
+# Fetch data from the iTunes API
+            json_data = fetch_itunes_data(user_input)
+            songs, movies, others = create_media_objects(json_data)
+# Display the results
+            display_results(songs, movies, others)
+# Additional input for preview
+            preview_input = input('Enter a number for more info, or another search term, or "exit": ')
+            handle_preview(preview_input, songs, movies, others)
+def create_media_objects(json_data):
+    songs = []
+    movies = []
+    others = []  # Add this line for other media types
+    for item in json_data['results']:
+        if item['wrapperType'] == 'track':
+            if item['kind'] == 'song':                 songs.append(Song(json=item))
+            elif item['kind'] == 'feature-movie':                 movies.append(Movie(json=item))
+            else:
+                others.append(Media(json=item))  # Add non-song, non-movie media to others
+    return songs, movies, others
+def display_results(songs, movies, others):     print("\nSONGS")
+    counter = 1  # Start counter from 1
+    for song in songs:
+        print(f"{counter} {song.info()}")
+        counter += 1  # Increment the counter for each song
+    print("\nMOVIES")
+    for movie in movies:
+        print(f"{counter} {movie.info()}")
+        counter += 1  # Continue incrementing the counter for each movie
+    print("\nOTHER MEDIA")
+    for other in others:
+        print(f"{counter} {other.info()}")  # Ensure correct method call with parentheses
+        counter += 1
+def handle_preview(preview_input, songs, movies, others):     try:
+        choice = int(preview_input) - 1
+        total_songs = len(songs)
+        total_movies = len(movies)
+        if 0 <= choice < total_songs:             webbrowser.open(songs[choice].url)
+            print(f"Launching {songs[choice].url} in web browser...")
+        elif total_songs <= choice < total_songs + total_movies:
+            index = choice - total_songs             webbrowser.open(movies[index].url)
+            print(f"Launching {movies[index].url} in web browser...")
+        elif total_songs + total_movies <= choice < total_songs + total_movies + len(others):
+            index = choice - total_songs - total_movies             webbrowser.open(others[index].url)
+            print(f"Launching {others[index].url} in web browser...")         else:
+            print("Invalid input. Please enter a valid number or search term.")
+    except ValueError:
+        print("Invalid input. Please enter a valid number or search term.")
+if __name__ == "__main__":     main()
